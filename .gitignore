@@ -1,0 +1,15 @@
+# Kubernetes credentials
+.kube/
+kubeconfig
+*.kubeconfig
+
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+secrets.yaml
+*-secret.yaml
+
+# Local files
+.DS_Store
+Thumbs.db
