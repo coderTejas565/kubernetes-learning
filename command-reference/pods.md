@@ -100,3 +100,9 @@ kubectl exec -it nginx-pod -- sh
 - A standalone Pod is not automatically recreated after deletion.
 
 **Reference:** [Kubernetes — Debugging Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/)
+
+
+
+kubectl get pods -w
+kubectl describe pod <pod-name>
+kubectl get pod <pod-name> -o yaml
