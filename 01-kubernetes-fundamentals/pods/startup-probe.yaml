@@ -1,0 +1,42 @@
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: startup-demo
+  labels:
+    app: startup-demo
+spec:
+  restartPolicy: Always
+  containers:
+    - name: slow-app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Application initialization started"
+          sleep 30
+          echo "Application initialization completed"
+          touch /tmp/started
+          httpd -f -p 8080
+
+      startupProbe:
+        exec:
+          command:
+            - sh
+            - -c
+            - test -f /tmp/started
+        periodSeconds: 5
+        failureThreshold: 12
+
+      livenessProbe:
+        tcpSocket:
+          port: 8080
+        periodSeconds: 5
+        failureThreshold: 3
+
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+        periodSeconds: 5
+        failureThreshold: 1
