@@ -41,6 +41,8 @@
 | `kubectl logs <pod-name> --previous` | View logs from the previous container instance |
 | `kubectl exec -it <pod-name> -- sh` | Open an interactive shell inside a container |
 | `kubectl exec <pod-name> -- <command>` | Execute a command inside a container |
+| `kubectl exec <pod-name> -- printenv` | Display environment variables inside a container |
+| `kubectl exec <pod-name> -- printenv <variable-name>` | Display a specific environment variable |
 | `kubectl port-forward pod/<pod-name> 8080:80` | Forward local port 8080 to Pod port 80 |
 
 ## 5. Services and Networking
@@ -124,7 +126,120 @@ These commands were used with the local `kind` cluster.
 | `crictl ps` | List containers managed through the CRI runtime |
 | `crictl pods` | List runtime Pod sandboxes |
 
-## 8. Useful Flags
+## 8. Configuration Management
+
+### ConfigMap
+
+#### Create and inspect
+
+| Command | Purpose |
+|---|---|
+| `kubectl create configmap <configmap-name> --from-literal=KEY=value` | Create a ConfigMap using a literal key-value pair |
+| `kubectl create configmap <configmap-name> --from-literal=KEY1=value1 --from-literal=KEY2=value2` | Create a ConfigMap with multiple key-value pairs |
+| `kubectl get configmaps` | List ConfigMaps in the current namespace |
+| `kubectl get configmap <configmap-name>` | Inspect ConfigMap metadata and key count |
+| `kubectl describe configmap <configmap-name>` | Display ConfigMap keys and values |
+| `kubectl get configmap <configmap-name> -o yaml` | Display the complete ConfigMap definition |
+| `kubectl edit configmap <configmap-name>` | Edit an existing ConfigMap |
+
+#### Consume ConfigMap values
+
+| Manifest field | Purpose |
+|---|---|
+| `valueFrom.configMapKeyRef` | Inject one selected ConfigMap key as an environment variable |
+| `envFrom.configMapRef` | Import all ConfigMap keys as environment variables |
+
+Example using an individual key:
+
+```yaml
+env:
+  - name: APP_NAME
+    valueFrom:
+      configMapKeyRef:
+        name: app-config
+        key: APP_NAME
+```
+
+Example importing all keys:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: app-config
+```
+
+### Secret
+
+#### Create and inspect
+
+| Command | Purpose |
+|---|---|
+| `kubectl create secret generic <secret-name> --from-literal=KEY=value` | Create a generic Secret using a literal key-value pair |
+| `kubectl create secret generic <secret-name> --from-literal=KEY1=value1 --from-literal=KEY2=value2` | Create a Secret with multiple key-value pairs |
+| `kubectl get secrets` | List Secrets in the current namespace |
+| `kubectl get secret <secret-name>` | Inspect Secret metadata and type |
+| `kubectl describe secret <secret-name>` | Inspect Secret metadata and key names without displaying values |
+| `kubectl get secret <secret-name> -o yaml` | Display Secret data in Base64-encoded form |
+| `kubectl edit secret <secret-name>` | Edit an existing Secret |
+
+#### Consume Secret values
+
+| Manifest field | Purpose |
+|---|---|
+| `valueFrom.secretKeyRef` | Inject one selected Secret key as an environment variable |
+| `envFrom.secretRef` | Import all Secret keys as environment variables |
+
+Example using an individual key:
+
+```yaml
+env:
+  - name: GEMINI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: app-secrets
+        key: GEMINI_API_KEY
+```
+
+Example importing all keys:
+
+```yaml
+envFrom:
+  - secretRef:
+      name: app-secrets
+```
+
+#### Update and decode
+
+| Command | Purpose |
+|---|---|
+| `kubectl create secret generic <secret-name> --from-literal=KEY=value --dry-run=client -o yaml \| kubectl apply -f -` | Generate and apply an updated Secret |
+| `kubectl get secret <secret-name> -o jsonpath='{.data.KEY}' \| base64 --decode` | Decode one Base64-encoded Secret value |
+
+**Important:** The decoding command prints the sensitive value to your terminal. Use it only with test credentials or in a secure environment.
+
+### Configuration changes and Pod restarts
+
+| Command | Purpose |
+|---|---|
+| `kubectl delete pod <pod-name>` | Delete a Pod so it can be recreated from its manifest |
+| `kubectl rollout restart deployment/<deployment-name>` | Restart a Deployment's Pods |
+| `kubectl rollout status deployment/<deployment-name>` | Monitor Deployment rollout progress |
+| `kubectl delete configmap <configmap-name>` | Delete a ConfigMap |
+| `kubectl delete secret <secret-name>` | Delete a Secret |
+
+**Important configuration concepts:**
+
+- ConfigMaps store non-sensitive application configuration.
+- Secrets store sensitive configuration such as API keys and database credentials.
+- `configMapKeyRef` and `secretKeyRef` select individual keys.
+- `envFrom` imports all keys from the referenced resource.
+- Environment variables are populated when a container starts. Updating a ConfigMap or Secret does not update existing environment variables.
+- Updating a Secret or ConfigMap alone does not automatically trigger a Deployment rollout.
+- ConfigMap and Secret values injected through environment variables require replacement containers to receive updated values.
+- Mounted ConfigMap and Secret files can update eventually, but applications must reload those files. A volume mount using `subPath` does not receive automatic updates.
+- Base64 is encoding, not encryption. Secure Secrets using appropriate encryption-at-rest configuration and RBAC permissions.
+
+## 9. Useful Flags
 
 | Flag | Purpose |
 |---|---|
@@ -147,5 +262,9 @@ These commands were used with the local `kind` cluster.
 4. A kind NodePort is not automatically accessible through Windows `localhost:<nodePort>`. The kind node runs inside a Docker container, and host port mappings must be configured for host access.
 5. A temporary `network-test` Pod created with `sleep 3600` exits after one hour. Recreate it if it has completed.
 6. `iptables-save` and `conntrack` commands inspect Linux networking inside the kind node container, not directly on the Windows host.
+7. ConfigMaps are intended for non-sensitive data. Do not store API keys, passwords or database credentials in them.
+8. Base64-encoded Secret values are easily reversible. Do not treat Base64 as encryption.
+9. Avoid committing real Secret values or credentials to Git. Restrict Secret access using RBAC and configure encryption at rest.
+10. Updating a ConfigMap or Secret does not automatically update environment variables in already-running containers.
 
 **Command reference principle:** Keep reusable commands here. Keep explanations, architecture diagrams, experiments and troubleshooting findings in their respective learning notes.
